@@ -15,6 +15,8 @@ from unidecode import unidecode
 
 load_dotenv()
 
+openai_api_key = os.getenv('OPENAI_API_KEY')
+
 PASTA_CONFIGURACOES = Path(__file__).parent / 'configuracoes'
 PASTA_CONFIGURACOES.mkdir(exist_ok=True)
 PASTA_MENSAGENS = Path(__file__).parent / 'mensagens'
