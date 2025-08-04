@@ -10,7 +10,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pathlib import Path
 import pickle
-import re   
+import re
 from unidecode import unidecode
 
 load_dotenv()
@@ -85,14 +85,8 @@ def pagina_chat():
             """
 
 
-        # Verificar se a chave da API existe
-        api_key = st.secrets.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            st.error("❌ Chave da API OpenAI não encontrada! Configure em Settings → Secrets")
-            return "Erro: Chave da API não configurada."
-        
         model = ChatOpenAI(
-            openai_api_key=api_key,
+            openai_api_key=os.getenv('OPENAI_API_KEY'),
             model='gpt-4o-mini',
             temperature=0.5,
             max_tokens=2000
