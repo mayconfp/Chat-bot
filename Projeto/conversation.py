@@ -15,7 +15,7 @@ from unidecode import unidecode
 
 load_dotenv()
 
-os.getenv("OPENAI_API_KEY", "sua_chave_aqui")
+os.getenv("OPENAI_API_KEY")
 
 
 PASTA_CONFIGURACOES = Path(__file__).parent / 'configuracoes'
@@ -89,7 +89,7 @@ def pagina_chat():
 
 
         model = ChatOpenAI(
-            openai_api_key=os.getenv('OPENAI_API_KEY'),
+            openai_api_key='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',
             model='gpt-4o-mini',
             temperature=0.5,
             max_tokens=2000
