@@ -1,4 +1,3 @@
-import chunk
 from turtle import onclick
 import streamlit as st
 import os
