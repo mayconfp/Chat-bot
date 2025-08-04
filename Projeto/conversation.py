@@ -15,7 +15,29 @@ from unidecode import unidecode
 
 load_dotenv()
 
-os.getenv("OPENAI_API_KEY")
+# Função para obter a API key com fallback para diferentes fontes
+def get_openai_api_key():
+    # 1. Primeiro tenta variável de ambiente
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key and api_key != "sua_chave_aqui":
+        return api_key
+    
+    # 2. Se não encontrar, tenta secrets do Streamlit
+    try:
+        api_key = st.secrets.get("OPENAI_API_KEY")
+        if api_key and api_key != "sua_chave_aqui":
+            return api_key
+    except:
+        pass
+    
+    # 3. Se ainda não encontrar, retorna None
+    return None
+
+# Verifica se a API key está disponível
+OPENAI_API_KEY = get_openai_api_key()
+if not OPENAI_API_KEY:
+    st.error("⚠️ OPENAI_API_KEY não encontrada! Configure a variável de ambiente OPENAI_API_KEY ou adicione no arquivo .streamlit/secrets.toml")
+    st.stop()
 
 
 PASTA_CONFIGURACOES = Path(__file__).parent / 'configuracoes'
@@ -62,21 +84,22 @@ def pagina_chat():
     #gerar resposta para IA com base no contexto e na pergunta do usuario
     def gerar_resposta(mensagens, entrada_usuario):
 
-        openai_api_key = os.getenv("OPENAI_API_KEY")
+        openai_api_key = get_openai_api_key()
         db = Chroma(persist_directory=CAMINHO_BANCO_DE_DADOS, embedding_function=OpenAIEmbeddings(openai_api_key=openai_api_key))
 
         # Busca similaridade
         resultados = db.similarity_search_with_relevance_scores(entrada_usuario, k=4)# o k é a qtd dos resultadados que vc qr qt mais aumenta mais contexto ele vai usar
         if len(resultados) == 0 or resultados[0][1] < 0.5:
             print("Não conseguiu encontrar nenhuma informação relevante na base")
-            return "Desculpe, não encontrei informações relevantes sobre esse assunto na base de dados."
+            # return "Desculpe, não encontrei informações relevantes sobre esse assunto na base de dados."
 
         textos_resultado = []
-        for resultado in resultados:
-            texto = resultado[0].page_content
-            textos_resultado.append(texto)
+        if len(resultados) > 0:
+            for resultado in resultados:
+                texto = resultado[0].page_content
+                textos_resultado.append(texto)
 
-        base_conhecimentos = "\n".join(textos_resultado)
+        base_conhecimentos = "\n".join(textos_resultado) if textos_resultado else "Informações gerais sobre a empresa Bluey."
 
         prompt_resposta_da_ia = f"""
             Você é a Vitória, assistente da empresa Bluey.
@@ -90,7 +113,7 @@ def pagina_chat():
 
 
         model = ChatOpenAI(
-            openai_api_key=os.getenv('OPENAI_API_KEY'),
+            openai_api_key=get_openai_api_key(),
             model='gpt-4o',
             temperature=0.5,
             max_tokens=2000

@@ -5,3 +5,7 @@ __pycache__/
 banco_de_dados/
 .DS_Store
 *.log
+
+# Streamlit secrets
+.streamlit/secrets.toml
+Projeto/.streamlit/secrets.toml
