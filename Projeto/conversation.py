@@ -1,4 +1,5 @@
 import chunk
+from turtle import onclick
 import streamlit as st
 import os
 from dotenv import load_dotenv
@@ -9,15 +10,25 @@ from langchain_community.vectorstores import Chroma, chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-
+from pathlib import Path
+import pickle
+import re
+from unidecode import unidecode
 
 load_dotenv()
+
+PASTA_CONFIGURACOES = Path(__file__).parent / 'configuracoes'
+PASTA_CONFIGURACOES.mkdir(exist_ok=True)
+PASTA_MENSAGENS = Path(__file__).parent / 'mensagens'
+PASTA_MENSAGENS.mkdir(exist_ok=True)
+CACHE_DESCONVERTE = {}
+
 CAMINHO_BANCO_DE_DADOS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'banco_de_dados'))
 print(f"DEBUG - CAMINHO_BANCO_DE_DADOS: {CAMINHO_BANCO_DE_DADOS}")
 
 def pagina_chat():
     #nosso title da page do chat
-    st.header("Chat com Leitura de Arquivos", divider=True) #linha abaixo do nosso titulo
+    st.header("ChatBot da Bluey", divider=True) #linha abaixo do nosso titulo
 
     #se nao ter mensagem ele retorna apenas vazia
     mensagens = st.session_state.get('mensagens', [])
@@ -53,8 +64,8 @@ def pagina_chat():
         db = Chroma(persist_directory=CAMINHO_BANCO_DE_DADOS, embedding_function=OpenAIEmbeddings())
 
         # Busca similaridade
-        resultados = db.similarity_search_with_relevance_scores(entrada_usuario, k=3)
-        if len(resultados) == 0 or resultados[0][1] < 0.7:
+        resultados = db.similarity_search_with_relevance_scores(entrada_usuario, k=4)# o k é a qtd dos resultadados que vc qr qt mais aumenta mais contexto ele vai usar
+        if len(resultados) == 0 or resultados[0][1] < 0.5:
             print("Não conseguiu encontrar nenhuma informação relevante na base")
             return "Desculpe, não encontrei informações relevantes sobre esse assunto na base de dados."
 
@@ -66,12 +77,14 @@ def pagina_chat():
         base_conhecimentos = "\n".join(textos_resultado)
 
         prompt_resposta_da_ia = f"""
-            Você é um assistente da empresa Bluey e se chama Vitória.
-            responda a pergunta do usuário: {entrada_usuario}
-
-            com base nessas informações: {base_conhecimentos}
+            Você é a Vitória, assistente da empresa Bluey.
+            
+            Informações da empresa: {base_conhecimentos}
+            
+            Responda à pergunta: {entrada_usuario}
+            
+            Se não houver informações específicas, seja amigável e ofereça ajuda.
             """
-
 
 
         model = ChatOpenAI(
@@ -86,7 +99,7 @@ def pagina_chat():
         return resposta.content
 
     # caso tenha mensagem do user ele criar a respost chamando a func gerar resposta
-    if mensagens:
+    if entrada_usuario:
         resposta_ia = gerar_resposta(mensagens, entrada_usuario)
 
         #exibe a resposta da IA
@@ -98,20 +111,151 @@ def pagina_chat():
         #repetimos para guardar para qd user enviar mensagem de novo
         st.session_state.mensagens = mensagens
 
+        if len(mensagens) >= 2:  # Só salva se tiver pelo menos uma pergunta e uma resposta
+            salvar_mensagens(mensagens)
 
-     
-# sidebar por enquanto so pega o arquivo
-def sidebar_pdf_e_conversas():
-    st.sidebar.header("Arquivo")
-    st.sidebar.file_uploader("Carregar Arquivo", type=["pdf"])
+        
+
+#SALVAMENTO E LEITURA DE CONVERSAS =================================================
+def converte_nome_mensagem(nome_mensagem):
+    nome_arquivo = unidecode(nome_mensagem)
+    nome_arquivo = re.sub('\\W+', '', nome_arquivo).lower()
+    return nome_arquivo
+
+
+def desconverte_nome_mensagem(nome_arquivo):
+    if not nome_arquivo in CACHE_DESCONVERTE:
+        
+        nome_mensagem = ler_mensagem_por_nome_arquivo(nome_arquivo, key='nome_mensagem')
+        
+        CACHE_DESCONVERTE[nome_arquivo] = nome_mensagem
+        
+    return CACHE_DESCONVERTE[nome_arquivo]
+    
+
+
+def retorna_nome_da_mensagem(mensagens):
+    for mensagem in mensagens:
+        if mensagem['role'] == 'user':
+            nome_mensagem = mensagem['content'][:30]
+            break
+    return nome_mensagem
+          
+
+
+def salvar_mensagens(mensagens):
+    if len(mensagens) == 0:
+        return False
+    nome_mensagem = ''
+    
+    for mensagem in mensagens:
+        if mensagem['role'] == 'user':
+            nome_mensagem = mensagem['content'][:30]
+            break
+    
+    nome_mensagem = retorna_nome_da_mensagem(mensagens)
+    nome_arquivo = converte_nome_mensagem(nome_mensagem)
+    arquivo_salvar = {'nome_mensagem': nome_mensagem,
+                      'nome_arquivo': nome_arquivo,
+                      'mensagem': mensagens}
+    
+    with open(PASTA_MENSAGENS / nome_arquivo, 'wb') as f:
+        pickle.dump(arquivo_salvar, f)
+    
+    
+def ler_mensagem_por_nome_arquivo(nome_arquivo, key='mensagem'):
+    with open (PASTA_MENSAGENS / nome_arquivo, 'rb') as f:
+        mensagens = pickle.load(f)
+    return mensagens[key]
+    
+
+
+def ler_mensagens(mensagens, key='mensagem'):
+    if len (mensagens) == 0:
+        return []
+    
+    nome_mensagem = retorna_nome_da_mensagem(mensagens)
+    nome_arquivo = converte_nome_mensagem(nome_mensagem)
+    with open (PASTA_MENSAGENS / nome_arquivo, 'rb') as f:
+        mensagens = pickle.load(f)
+        
+    return mensagens[key]
 
 
 
+def listar_conversas():
+    conversas = list(PASTA_MENSAGENS.glob('*'))    
+    conversas = sorted(conversas, key=lambda item: item.stat().st_mtime_ns, reverse=True)
+    return [c.stem for c in conversas]
+
+def excluir_conversa(nome_arquivo):
+    if (PASTA_MENSAGENS / nome_arquivo).exists():
+        os.remove(PASTA_MENSAGENS / nome_arquivo)
+        st.session_state['mensagens'] = []
+        st.session_state['conversa_atual'] = ''
+    else:
+        st.error('Conversa não encontrada!')
+
+
+def tab_conversas(tab):
+    tab.button('➕ Nova conversa',
+               on_click=seleciona_conversa, 
+               args=('',),
+               use_container_width=True)
+    tab.markdown('')
+    conversas = listar_conversas()
+    
+    for nome_arquivo in conversas:
+        nome_mensagem = desconverte_nome_mensagem(nome_arquivo).capitalize()
+        if len (nome_mensagem) == 30:
+            nome_mensagem += '...'
+            
+        col1, col2 = tab.columns([0.85, 0.15])
+        
+        col1.button(
+            label=nome_mensagem,
+            on_click=seleciona_conversa,
+            args=(nome_arquivo,),
+            key=f'conversa_{nome_arquivo}',
+            disabled = nome_arquivo==st.session_state['conversa_atual'],
+            use_container_width=True,                  
+        )
+        col2.button(
+            label='🗑️',
+            on_click=excluir_conversa,
+            args=(nome_arquivo,),
+            key=f'deletar_{nome_arquivo}',
+            use_container_width=True,
+        )
+            
+        
+def seleciona_conversa(nome_arquivo):
+    if nome_arquivo == '':
+        st.session_state.mensagens = []
+    else:
+        mensagem = ler_mensagem_por_nome_arquivo(nome_arquivo, key='mensagem')
+        st.session_state.mensagens = mensagem
+    st.session_state['conversa_atual'] = nome_arquivo
+
+#inicializacao das conversas e da conversa atual
+def inicializacao():
+    if not 'mensagens' in st.session_state:
+        st.session_state.mensagens = []
+    if not 'conversa_atual' in st.session_state:
+        st.session_state.conversa_atual = ''
+
+    
+
+def sidebar_conversas():
+    st.sidebar.header("Conversas")
+    tab_conversas(st.sidebar)
 
 #dentro de main rodamos a page de chat e o sidebar
 def main():
+    inicializacao()
     pagina_chat()
-    sidebar_pdf_e_conversas()
+    sidebar_conversas()
+   
 
 
 
