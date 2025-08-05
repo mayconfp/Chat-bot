@@ -40,8 +40,6 @@ if not OPENAI_API_KEY:
     st.stop()
 
 
-PASTA_CONFIGURACOES = Path(__file__).parent / 'configuracoes'
-PASTA_CONFIGURACOES.mkdir(exist_ok=True)
 PASTA_MENSAGENS = Path(__file__).parent / 'mensagens'
 PASTA_MENSAGENS.mkdir(exist_ok=True)
 CACHE_DESCONVERTE = {}
