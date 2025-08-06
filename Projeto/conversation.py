@@ -83,7 +83,7 @@ def pagina_chat():
     def gerar_resposta(mensagens, entrada_usuario):
 
         openai_api_key = get_openai_api_key()
-        db = Chroma(persist_directory=CAMINHO_BANCO_DE_DADOS, embedding_function=OpenAIEmbeddings(openai_api_key=openai_api_key))
+        db = Chroma(persist_directory=CAMINHO_BANCO_DE_DADOS, embedding_function=OpenAIEmbeddings(openai_api_key=openai_api_key, model='text-embedding-3-small'))
 
         # Busca similaridade
         resultados = db.similarity_search_with_relevance_scores(entrada_usuario, k=4)# o k é a qtd dos resultadados que vc qr qt mais aumenta mais contexto ele vai usar
