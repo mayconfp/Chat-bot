@@ -102,9 +102,11 @@ def pagina_chat():
         prompt_resposta_da_ia = f"""
             Você é a Vitória, assistente da empresa Bluey.
             
-            Informações da empresa: {base_conhecimentos}
+            Informações da empresa extraídas dos documentos: {base_conhecimentos}
             
             Responda à pergunta: {entrada_usuario}
+            
+            IMPORTANTE: Sempre cite a origem das informações quando possível, mencionando que os dados vêm dos documentos da empresa Bluey.
             
             Se não houver informações específicas, seja amigável e ofereça ajuda.
             """
